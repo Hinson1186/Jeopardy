@@ -3,7 +3,7 @@ name = ["a", "b", "c"]
 print(f"{name} is here")
 print(Hi)
 
-# I added Player class only, still thinking what to do
+# I added Player class only, still thinking what to do, here is referencing from ppt p.39
 class Actor:
     def __init__(self, name: str):
         self.name = name
