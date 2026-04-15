@@ -1,3 +1,4 @@
 Welcome to AIST 1110 project!!!
 
-https://omniread-ruby.vercel.app/
+15/4/2026
+Currently completed Player class.

@@ -1,10 +1,7 @@
 import abc as abc
-# Testing code
-name = ["a", "b", "c"]
-print(f"{name} is here")
-print(Hi)
+import pygame as pg
 
-# I added Player class only, still thinking what to do, here is referencing from ppt p.39
+#Read README.md before editing
 class Actor:
     def __init__(self, name: str):
         self.name = name
@@ -16,10 +13,12 @@ class Actor:
     def minus_score(self, pt: int):
         self.score -= pt
 
+
 class Player(Actor):
     def __init__(self, name: str, score: int = 0):
         super().__init__(name)
         self.score = score
+
 
 class AI_Player(Player):
     def __init__(self, name: str, score: int = 0):
@@ -34,7 +33,14 @@ class Game(abc.ABC):
     def start(self):
         pass
 
-class Clue：
-    def__init__(self, question: str, answer: str):
+class Clue:
+    def __init__(self, category: str, question: str, correct_answer: str, wrong_answers: list, pt_value: int):
+        self.category = category
         self.question = question
-        self.answer = answer
+        self.correct_answer = correct_answer
+        self.pt_value = pt_value
+
+        self.mc_options = [correct_answer] + wrong_answers
+    
+    def check_ans(self, ans: str) -> bool:
+        return ans == self.correct_answer
