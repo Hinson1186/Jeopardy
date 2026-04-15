@@ -1,3 +1,4 @@
+import abc as abc
 # Testing code
 name = ["a", "b", "c"]
 print(f"{name} is here")
@@ -19,3 +20,21 @@ class Player(Actor):
     def __init__(self, name: str, score: int = 0):
         super().__init__(name)
         self.score = score
+
+class AI_Player(Player):
+    def __init__(self, name: str, score: int = 0):
+        super().__init__(name, score)
+        self.score = score
+
+class Game(abc.ABC):
+    def __init__(self):
+        self.players = []
+
+    @abc.abstractmethod
+    def start(self):
+        pass
+
+class Clue：
+    def__init__(self, question: str, answer: str):
+        self.question = question
+        self.answer = answer
