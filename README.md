@@ -1,8 +1,11 @@
-Welcome to AIST 1110 project!!!
-ABC
-15/4/2026
+# Welcome to AIST 1110 project!!!
+
+## Project Log:
+* 15/4/2026
 Currently completed Player class. 
-2/5/2026
+* 2/5/2026
+added different sections.
+```text
 jeopardy_project/
 |
 |-- main.py                 # Main entry point, starts the game.
@@ -23,3 +26,4 @@ jeopardy_project/
 |   |   |-- correct_answer.wav
 |   |-- fonts/
 |       |-- jeopardy_font.ttf
+```
