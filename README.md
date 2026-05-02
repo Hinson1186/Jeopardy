@@ -1,4 +1,11 @@
-# Welcome to AIST 1110 project!!!
+# Unwelcome to AIST 1110 project :(
+
+```diff
+## Notice:
+* This project is not completed yet.
+* Please do not expect any functional features.
+* Put .venv in .gitignore after the project is completed.
+```
 
 ## Project Log:
 * 15/4/2026
