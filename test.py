@@ -50,4 +50,18 @@ class Board:
         self.categories = []
 
     def get_from_azure(self):
+        fetched_clues = []
+        for clues in fetched_clues:
+            self.catergories(clues.category).append(clues)
         pass
+
+class Azure:
+    def __init__(self):
+        pass
+
+class MainGame(Game):
+    def__init__(self):
+        super().__init__()
+        self.board = Board()
+
+    
