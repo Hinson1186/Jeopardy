@@ -1,5 +1,5 @@
-import abc as abc
-import pygame as pg
+import abc as ABC, abstractmethod 
+import pygame 
 
 #Read README.md before editing
 class Actor:
@@ -44,3 +44,10 @@ class Clue:
     
     def check_ans(self, ans: str) -> bool:
         return ans == self.correct_answer
+    
+class Board:
+    def__init__(self):
+        self.categories = []
+
+    def get_from_azure(self):
+        pass
