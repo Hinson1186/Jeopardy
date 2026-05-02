@@ -1,5 +1,5 @@
-import abc as ABC, abstractmethod 
-import pygame 
+from abc import ABC, abstractmethod
+import pygame
 
 #Read README.md before editing
 class Actor:
@@ -25,11 +25,11 @@ class AI_Player(Player):
         super().__init__(name, score)
         self.score = score
 
-class Game(abc.ABC):
+class Game(ABC):
     def __init__(self):
         self.players = []
 
-    @abc.abstractmethod
+    @abstractmethod
     def start(self):
         pass
 
@@ -46,13 +46,13 @@ class Clue:
         return ans == self.correct_answer
     
 class Board:
-    def__init__(self):
+    def __init__(self):
         self.categories = []
 
     def get_from_azure(self):
         fetched_clues = []
         for clues in fetched_clues:
-            self.catergories(clues.category).append(clues)
+            self.categories(clues.category).append(clues)
         pass
 
 class Azure:
@@ -60,8 +60,7 @@ class Azure:
         pass
 
 class MainGame(Game):
-    def__init__(self):
+    def __init__(self):
         super().__init__()
         self.board = Board()
 
-    
