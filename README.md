@@ -2,9 +2,9 @@
 
 ```diff
 * **Notice:**
-* - This project is not completed yet.
-* - Please do not expect any functional features.
-* - Put .venv in .gitignore after the project is completed.
+* <span style="color:red">This project is not completed yet.
+* Please do not expect any functional features.
+* Put .venv in .gitignore after the project is completed. </span>
 ```
 
 ## Project Log:
