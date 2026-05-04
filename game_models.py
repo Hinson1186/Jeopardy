@@ -32,5 +32,12 @@ class AI_Player(Player):
     def __init__(self, name: str, score: int = 0):
         super().__init__(name, score)
         self.score = score
+    
+    def delay_time(self, difficulty: str) -> int:
+        if(self.score < 1000 and difficulty == "easy"):
+            return 5
+        elif(self.score < 2000 and difficulty == "medium"):
+            return 7
+        pass
 
 class 
