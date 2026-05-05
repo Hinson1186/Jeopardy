@@ -40,4 +40,4 @@ class AI_Player(Player):
             return 7
         pass
 
-class 
+    def
