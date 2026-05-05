@@ -34,3 +34,5 @@ jeopardy_project/
 |   |-- fonts/
 |       |-- jeopardy_font.ttf
 ```
+* 5/5/2026
+kind of completed the game_models, please revisit the thinking time and the chance of answering correctly. (Read slide p.47 fyr)

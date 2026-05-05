@@ -1,3 +1,5 @@
+import random
+
 class Clue:
     def __init__(self, category: str, question: str, correct_answer: str, wrong_answers: list, pt_value: int):
         self.category = category
@@ -29,9 +31,10 @@ class Player(Actor):
 
 
 class AI_Player(Player):
-    def __init__(self, name: str, score: int = 0):
+    def __init__(self, name: str, score: int = 0, difficulty: str):
         super().__init__(name, score)
         self.score = score
+        self.difficulty = difficulty
     
     def delay_time(self, difficulty: str) -> int:
         if(self.score < 1000 and difficulty == "easy"):
@@ -40,4 +43,6 @@ class AI_Player(Player):
             return 7
         pass
 
-    def
+    def correct_probability(self) -> bool:
+        correct_chance = {"easy": 1, "medium": 1, "hard": 1}
+        return random.random() < correct_chance[self.difficulty]
