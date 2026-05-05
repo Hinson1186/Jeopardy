@@ -32,7 +32,7 @@ venv/
 ENV/
 env/
 ENV/
-api_key.txt
+api_key/
 
 # Environment variables (secrets!)
 .env
