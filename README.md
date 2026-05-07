@@ -36,3 +36,11 @@ jeopardy_project/
 ```
 * 5/5/2026
 kind of completed the game_models, please revisit the thinking time and the chance of answering correctly. (Read slide p.47 fyr)
+
+* 7/5/2026
+Upload parts of assets.
+Draft api.py.
+```diff
+- Have to ensure where to put the API key file, it better to be in the same directory as api.py for simplicity.
+- Test api.py after plug in the API key. For functionality and performance of AI under prompt.
+```
