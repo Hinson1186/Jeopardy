@@ -4,7 +4,8 @@
 ```diff
 - This project is not completed yet.
 - Please do not expect any functional features.
-- Put .venv in .gitignore after the project is completed. 
+- Put .venv in .gitignore after the project is completed.
+- Put API key before submitting the project.
 ```
 
 ## Project Log:
@@ -40,7 +41,10 @@ kind of completed the game_models, please revisit the thinking time and the chan
 * 7/5/2026
 Upload parts of assets.
 Draft api.py.
+
+* 8/5/2026
+Add game_logic.py and player.py.
 ```diff
-- Have to ensure where to put the API key file, it better to be in the same directory as api.py for simplicity.
 - Test api.py after plug in the API key. For functionality and performance of AI under prompt.
+- tmp.py can be removed, but still double check or wait until all functions in tmp.py are completed in other files.
 ```

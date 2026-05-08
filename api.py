@@ -6,17 +6,19 @@ class LLMHelper:
         self.api_key = self._read_api_key(key_filename)
         
         # NOTE
-        self.endpoint = "https://cuhk-apip.developer.azure-api.net/api/v1/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2023-05-15"
+        self.endpoint = "https://cuhk-apip.azure-api.net/openai"
 
     def _read_api_key(self, filename):
+        """Read API key from file."""
         try:
             with open(filename, 'r') as file:
-                return file.read().strip() 
+                return file.read().strip()
         except FileNotFoundError:
             print(f"Error: Could not find the file '{filename}'.")
             return None
 
     def generate_jeopardy_board(self, num_categories=3, clues_per_category=3):
+        """Call API to generate a list of categories and questions."""
         if not self.api_key:
             return None
 

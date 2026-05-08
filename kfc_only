@@ -30,10 +30,10 @@ File Organization:
 Jeopardy_Project/
 │
 ├── main.py                  # The entry point (initializes Pygame and runs the main loop)
-├── game_logic.py            # Contains the Game, Board, and Question classes
-├── players.py               # Contains Actor, HumanPlayer, and AIPlayer
+├── game_logic.py    test        # Contains the Game, Board, and Question classes
+├── players.py       test        # Contains Actor, HumanPlayer, and AIPlayer
 ├── powerups.py              # (Optional) Contains your PowerUp classes for bonus marks
-├── api.py                   # Contains the Azure ChatGPT API connection code
+├── api.py           test        # Contains the Azure ChatGPT API connection code
 ├── ui.py                    # Handles Pygame drawing (buttons, text, screens)
 │
 ├── assets/                  # Put all your downloaded files here!
