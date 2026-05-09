@@ -10,6 +10,25 @@ Audio:
     - Source: OrangeFreeSounds
     - URL: https://orangefreesounds.com/jeopardy-theme-song/
 
+2. Count Down Beeper
+   - Source: Freesound.org
+   - URL: https://freesound.org/people/makkuzu/sounds/653956/
+
+3. "Correct" Sound Effect
+   - Source: Freesound.org
+   - URL: https://freesound.org/people/Mihacappy/sounds/844146/
+
+4. "Wrong" Sound Effect
+   - Source: Freesound.org
+   - URL: https://freesound.org/people/jeremysykes/sounds/341256/
+
+5. "Power-ups" Sound Effect
+   - Source: Freesound.org
+   - URL: https://freesound.org/people/Mrthenoronha/sounds/511385/
+
+6. "Press Button" Sound Effect
+   - Source: Freesound.org
+   - URL: https://freesound.org/people/Joao_Janz/sounds/478343/
 Images:
 ---------------------
 1. Jeopardy Studio Photos
@@ -23,6 +42,10 @@ Images:
 3. Neon LED screen
    - Source: Magnific.com
    - URL: https://www.magnific.com/free-vector/pink-neon-product-podium-with-digital-led-screen_263582340.htm#fromView=keyword&page=1&position=44&uuid=7873e492-c456-4a5e-8961-d87ba0738c5b&query=Jeopardy+studio
+
+4. "Power-ups" Elements
+   - Source: Flaticon
+   - URL: https://www.flaticon.com/
 
 AI Generation:
 ---------------------
