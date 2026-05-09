@@ -1,4 +1,5 @@
 import random
+import time
 
 class Actor:
     def __init__(self, name: str):
@@ -29,11 +30,11 @@ class AI_Player(Actor):
     def delay_time(self) -> int:
         """Fake AI thinking time."""
         if self.difficulty == "easy":
-            return random.randint(3, 6)
+            return random.uniform(2.5, 4.0)
         elif self.difficulty == "medium":
-            return random.randint(2, 5)
-        else:
-            return random.randint(1, 3)
+            return random.uniform(1.5, 3.0)
+        else: 
+            return random.uniform(0.5, 1.5)
 
     def is_correct(self) -> bool:
         """AI get the answer right based on probability."""
