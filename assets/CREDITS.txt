@@ -29,6 +29,10 @@ Audio:
 6. "Press Button" Sound Effect
    - Source: Freesound.org
    - URL: https://freesound.org/people/Joao_Janz/sounds/478343/
+
+7. Another "Power-ups" Sound Effect
+   - Source: Freesound.org
+   - URL: https://freesound.org/people/GameAudio/sounds/220173/
 Images:
 ---------------------
 1. Jeopardy Studio Photos
