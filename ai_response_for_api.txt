@@ -1,0 +1,163 @@
+You are right, the endpoint URL in your api.py is incomplete. An Azure API
+endpoint needs to point to a specific "deployment" of a model. I cannot know the
+exact name of the deployment provided by CUHK, as that is specific to your
+course's subscription.
+
+However, based on the URL provided in your project slides
+(https://cuhk-apip.developer.azure-api.net/) and standard Azure API formats, the
+final URL will likely look something like this:
+
+https://cuhk-apip.azure-api.net/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=YYYY-MM-DD
+
+You must find the YOUR_DEPLOYMENT_NAME and the correct api-version from the
+tutorial materials provided by your TAs (as mentioned on slide 52).
+
+To solve your immediate problem of making api.py testable on its own, I have
+implemented a critical feature: a Dummy Mode.
+
+If the LLMHelper cannot find your API key file, it will now automatically switch
+to a dummy mode and generate a valid, hardcoded test board without calling the
+API. This allows you to continue developing and testing the rest of your game
+logic even if your API key is not yet working.
+
+Logically Corrected and Testable api.py
+
+Here is the refined code. I have only modified the LLMHelper class to add the
+dummy mode and clarify the endpoint issue.
+
+import requests
+import json
+import time
+
+class LLMHelper:
+    def __init__(self, key_filename="YOUR_API_KEY_FILE.txt"):
+        self.api_key = self._read_api_key(key_filename)
+        self.dummy_mode = False
+
+        if not self.api_key:
+            print("--- WARNING: API key file not found or empty. Running in DUMMY MODE. ---")
+            self.dummy_mode = True
+        
+        # NOTE: This endpoint is INCOMPLETE. 
+        # You MUST find your specific deployment name and api-version from your
+        # course materials (see slide 52) and append them.
+        # It will look something like: "https://cuhk-apip.azure-api.net/openai/deployments/YOUR_DEPLOYMENT/chat/completions?api-version=YYYY-MM-DD"
+        self.endpoint = "https://cuhk-apip.azure-api.net/openai"
+
+    def _read_api_key(self, filename):
+        """Read API key from file."""
+        try:
+            with open(filename, 'r') as file:
+                return file.read().strip()
+        except FileNotFoundError:
+            # This is not an error, it's how we trigger dummy mode.
+            return None
+
+    def _get_dummy_board(self, num_categories, clues_per_category):
+        """Generates a hardcoded board for testing without an API key."""
+        print("--- Generating a fake board for testing... ---")
+        time.sleep(1) # Simulate network delay
+        
+        board = {"categories": []}
+        for i in range(num_categories):
+            category = {
+                "name": f"Test Category {i+1}",
+                "questions": []
+            }
+            for j in range(clues_per_category):
+                value = (j + 1) * 200
+                question = {
+                    "value": value,
+                    "clue": f"This is a test clue for {value} points.",
+                    "choices": [f"What is Correct {j}?", f"What is Wrong A{j}?", f"What is Wrong B{j}?"],
+                    "correct": f"What is Correct {j}?"
+                }
+                category["questions"].append(question)
+            board["categories"].append(category)
+        return board
+
+    def generate_jeopardy_board(self, num_categories=3, clues_per_category=3):
+        """Call API to generate a list of categories and questions."""
+        if self.dummy_mode:
+            return self._get_dummy_board(num_categories, clues_per_category)
+
+        system_prompt = (
+            "You are a Jeopardy game show assistant. "
+            "Generate trivia categories and clues. "
+            "Always respond ONLY in valid JSON format. Do not include markdown code blocks like ```json."
+        )
+
+        user_prompt = (
+            f"Generate a Jeopardy board with {num_categories} categories. "
+            f"Each category must have {clues_per_category} clues with values $200, $400, $600. "
+            "For each clue, provide the clue text, 3 multiple-choice options (phrased as questions, e.g., 'What is X?'), "
+            "and specify the correct answer exactly as it appears in the options. "
+            "Format the output strictly as this JSON structure:\n"
+            "{\n"
+            "  \"categories\": [\n"
+            "    {\n"
+            "      \"name\": \"Category Name\",\n"
+            "      \"questions\": [\n"
+            "        {\n"
+            "          \"value\": 200,\n"
+            "          \"clue\": \"Clue text here\",\n"
+            "          \"choices\": [\"Option 1\", \"Option 2\", \"Option 3\"],\n"
+            "          \"correct\": \"Option 2\"\n"
+            "        }\n"
+            "      ]\n"
+            "    }\n"
+            "  ]\n"
+            "}"
+        )
+
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": self.api_key
+        }
+
+        payload = {
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": 0.7
+        }
+
+        print("Sending request to Azure ChatGPT... (This might take a few seconds)")
+        
+        try:
+            response = requests.post(self.endpoint, headers=headers, json=payload)
+            response.raise_for_status()
+            
+            response_data = response.json()
+            chat_reply = response_data['choices']['message']['content']
+            
+            board_data = json.loads(chat_reply)
+            return board_data
+
+        except requests.exceptions.RequestException as e:
+            print(f"ERROR: Failed to connect to Azure. Check your endpoint URL and internet connection. Details: {e}")
+            return None
+        except (KeyError, json.JSONDecodeError) as e:
+            print(f"ERROR: Could not parse the AI's response. It may not be valid JSON. Details: {e}")
+            # The following line is useful for debugging the AI's raw output
+            # print("Raw AI Response:", response.text)
+            return None
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            return None
+
+# --- Testing Block ---
+if __name__ == "__main__":
+    # To test with your REAL key, create a file named 'api_key.txt' with your key in it.
+    # To test in DUMMY MODE, simply delete or rename 'api_key.txt'.
+    llm = LLMHelper(key_filename="api_key.txt") 
+    
+    test_board = llm.generate_jeopardy_board(num_categories=2, clues_per_category=2)
+    
+    if test_board:
+        print("\nSuccess! Here is the parsed data:\n")
+        # Pretty-print the JSON data
+        print(json.dumps(test_board, indent=4))
+    else:
+        print("\nFailed to get the board. Check the error messages above.")

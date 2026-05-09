@@ -1,93 +1,124 @@
-import requests
+import os
 import json
+import time
+import base64
+import requests
+from io import BytesIO
+from PIL import Image
+from dotenv import load_dotenv
+from openai import OpenAI
 
+# class to handle all the AI stuff
 class LLMHelper:
-    def __init__(self, key_filename="YOUR_API_KEY_FILE.txt"):
-        self.api_key = self._read_api_key(key_filename)
+    def __init__(self):
+        load_dotenv() # load .env file
+        self.api_key = os.getenv("AZURE_API_KEY")
         
-        # NOTE
-        self.endpoint = "https://cuhk-apip.azure-api.net/openai"
-
-    def _read_api_key(self, filename):
-        """Read API key from file."""
-        try:
-            with open(filename, 'r') as file:
-                return file.read().strip()
-        except FileNotFoundError:
-            print(f"Error: Could not find the file '{filename}'.")
-            return None
+        self.base_url = "https://cuhk-apip.azure-api.net/openai-eus2/openai/v1"
+        self.image_endpoint = self.base_url + "/images/generations/standard"
+        
+        if self.api_key == None:
+            print("API KEY IS MISSING!")
+            
+        # setup openai client
+        self.client = OpenAI(
+            base_url=self.base_url,
+            api_key=self.api_key,
+            default_headers={"api-key": self.api_key},
+        )
 
     def generate_jeopardy_board(self, num_categories=3, clues_per_category=3):
-        """Call API to generate a list of categories and questions."""
-        if not self.api_key:
+        # prompts
+        system_prompt = "You are a Jeopardy game show assistant. Generate trivia categories and clues. Always respond ONLY in valid JSON format. Do not include markdown code blocks like ```json."
+        
+        user_prompt = f"Generate a Jeopardy board with {num_categories} categories. Each category must have {clues_per_category} clues with values 200, 400, 600. For each clue, provide the clue text, 3 multiple-choice options (phrased as questions, e.g., 'What is X?'), and specify the correct answer exactly as it appears in the options. Format the output strictly as this JSON structure: {{\"categories\":[{{\"name\": \"Category Name\", \"questions\":[{{\"value\": 200, \"clue\": \"Clue text here\", \"choices\":[\"Option 1\", \"Option 2\", \"Option 3\"], \"correct\": \"Option 2\"}}]}}]}}"
+
+        print("asking gpt-5.1 for questions... wait a sec")
+        
+        try:
+            res = self.client.chat.completions.create(
+                model="gpt-5.1",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.7,
+            )
+            
+            chat_reply = res.choices[0].message.content
+            
+            # fix markdown issue if AI adds it
+            chat_reply = chat_reply.strip()
+            if chat_reply.startswith("```json"):
+                chat_reply = chat_reply[7:-3].strip()
+            elif chat_reply.startswith("```"):
+                chat_reply = chat_reply[3:-3].strip()
+            
+            return json.loads(chat_reply)
+
+        except Exception as e:
+            print("Error getting board:", e)
             return None
 
-        system_prompt = (
-            "You are a Jeopardy game show assistant. "
-            "Generate trivia categories and clues. "
-            "Always respond ONLY in valid JSON format. Do not include markdown code blocks like ```json."
-        )
-
-        user_prompt = (
-            f"Generate a Jeopardy board with {num_categories} categories. "
-            f"Each category must have {clues_per_category} clues with values $200, $400, $600. "
-            "For each clue, provide the clue text, 3 multiple-choice options (phrased as questions, e.g., 'What is X?'), "
-            "and specify the correct answer exactly as it appears in the options. "
-            "Format the output strictly as this JSON structure:\n"
-            "{\n"
-            "  \"categories\": [\n"
-            "    {\n"
-            "      \"name\": \"Category Name\",\n"
-            "      \"questions\": [\n"
-            "        {\n"
-            "          \"value\": 200,\n"
-            "          \"clue\": \"Clue text here\",\n"
-            "          \"choices\": [\"Option 1\", \"Option 2\", \"Option 3\"],\n"
-            "          \"correct\": \"Option 2\"\n"
-            "        }\n"
-            "      ]\n"
-            "    }\n"
-            "  ]\n"
-            "}"
-        )
+    def generate_image_for_clue(self, prompt):
+        # request body for image api
+        payload = {
+            "prompt": prompt,
+            "n": 1,
+            "size": "1024x1024",
+            "quality": "medium",
+            "output_format": "png"
+        }
 
         headers = {
             "Content-Type": "application/json",
             "api-key": self.api_key
         }
 
-        payload = {
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            "temperature": 0.7
-        }
+        print("asking for image: " + prompt)
 
-        print("Sending request to Azure ChatGPT... (This might take a few seconds)")
-        
         try:
-            response = requests.post(self.endpoint, headers=headers, json=payload)
-            response.raise_for_status()
+            res = requests.post(self.image_endpoint, headers=headers, json=payload, timeout=120)
             
-            response_data = response.json()
-            chat_reply = response_data['choices'][0]['message']['content']
-            
-            board_data = json.loads(chat_reply)
-            return board_data
+            if res.status_code == 200:
+                # get base64 string from json
+                img_data = res.json()["data"][0]["b64_json"]
+                img_bytes = base64.b64decode(img_data)
+
+                # make folders if they don't exist (lazy way)
+                try:
+                    os.mkdir("assets")
+                except: pass
+                try:
+                    os.mkdir("assets/images")
+                except: pass
+
+                # save the file with a timestamp so it doesn't overwrite
+                file_name = "assets/images/clue_img_" + str(int(time.time())) + ".png"
+                
+                img = Image.open(BytesIO(img_bytes))
+                img.save(file_name)
+                
+                print("saved image at", file_name)
+                return file_name
+            else:
+                print("api error:", res.text)
+                return None
 
         except Exception as e:
-            print(f"Failed to generate questions: {e}")
+            print("failed to make image:", e)
             return None
 
-# --- Testing Block ---
+# for testing only
 if __name__ == "__main__":
-    llm = LLMHelper(key_filename="api_key.txt") 
+    api = LLMHelper() 
     
-    test_board = llm.generate_jeopardy_board(num_categories=2, clues_per_category=2)
-    
-    if test_board:
-        print("\nSuccess! Here is the parsed data:\n")
-        print(json.dumps(test_board, indent=4))
-    else:
-        print("\nFailed to get the board. Check your API key and endpoint URL.")
+    print("--- testing text ---")
+    board = api.generate_jeopardy_board(1, 2)
+    print(board)
+
+    print("\n--- testing image ---")
+    # try to generate a random image to see if it works
+    img_path = api.generate_image_for_clue("a pixel art of a python snake")
+    if img_path != None:
+        Image.open(img_path).show()
