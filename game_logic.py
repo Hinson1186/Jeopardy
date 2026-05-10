@@ -10,7 +10,7 @@ class Clue:
         self.pt_value = pt_value
         self.is_answered = False
         self.is_daily_double = False
-        self.image_path = None
+        self.image_path = None 
         
         self.mc_options = [correct_answer] + wrong_answers
         random.shuffle(self.mc_options)
@@ -57,6 +57,7 @@ class Board:
                 dd.is_daily_double = True
 
     def is_complete(self) -> bool:
+        if not self.categories: return False
         for clues in self.categories.values():
             if any(not c.is_answered for c in clues):
                 return False
@@ -66,23 +67,18 @@ class JeopardyGameManager:
     def __init__(self):
         self.llm_helper = LLMHelper()
         self.board = Board()
-        
         self.players = [Player("Human")]
         self.ai_counter = 1
-        
         self.current_clue = None
         self.game_state = "START_MENU" 
-        self.round_num = 1
-        
+        self.round_num = 1 
         self.current_wager = 5
         self.max_wager = 1000
-        
-        self.active_player_index = 0
+        self.active_player_index = 0 
 
     def add_ai_player(self, difficulty: str):
-        """Adds an AI player to the lobby."""
         if len(self.players) < 3:
-            self.players.append(AI_Player(f"Bot {self.ai_counter}", difficulty=difficulty))
+            self.players.append(AI_Player(f"Bot {self.ai_counter} ({difficulty})", difficulty=difficulty))
             self.ai_counter += 1
 
     def remove_ai_player(self):
@@ -90,65 +86,50 @@ class JeopardyGameManager:
             self.players.pop()
             self.ai_counter -= 1
 
-    def advance_round(self):
-        self.round_num += 1
+    def setup_new_round(self, num_cats=6, clues_per=5):
+        """Fetches board for the current round number"""
+        self.game_state = "LOADING"
+        dd_count = 1 if self.round_num == 1 else 2
         
-        # Double Jeopardy
-        if self.round_num == 2:
-            self.game_state = "LOADING"
-            api_data = self.llm_helper.generate_jeopardy_board(num_categories=6, clues_per_category=5, round_num=2)
-            if api_data:
-                self.board.populate_from_api(api_data, self.llm_helper, num_daily_doubles=2)
-                self.game_state = "SHOWING_BOARD"
-            else:
-                self.game_state = "ERROR"
-                
-        # Final Jeopardy
-        elif self.round_num == 3:
+        api_data = self.llm_helper.generate_jeopardy_board(num_categories=num_cats, clues_per_category=clues_per, round_num=self.round_num)
+        
+        if api_data:
+            self.board.populate_from_api(api_data, self.llm_helper, num_daily_doubles=dd_count)
+            self.game_state = "SHOWING_BOARD"
+        else:
+            self.game_state = "ERROR"
+
+    def advance_round(self):
+        if self.round_num < 2:
+            self.round_num = 2
+            self.setup_new_round(6, 5)
+        elif self.round_num == 2:
+            self.round_num = 3
             self.players = [p for p in self.players if p.score > 0]
-            
-            if len(self.players) == 0:
+            if not self.players:
                 self.game_state = "GAME_OVER"
                 return
-                
-            self.game_state = "LOADING"
-            api_data = self.llm_helper.generate_jeopardy_board(num_categories=1, clues_per_category=1, round_num=3)
-            if api_data:
-                self.board.populate_from_api(api_data, self.llm_helper, num_daily_doubles=0)
-                
-                cat_name = list(self.board.categories.keys())[0]
-                self.current_clue = self.board.categories[cat_name][0]
-                
-                for p in self.players:
-                    if not p.is_human:
-                        p.final_wager = p.determine_wager(p.score)
-                        
-                self.active_player_index = 0
-                if self.players[0].is_human:
-                    self.max_wager = self.players[0].score
-                    self.current_wager = 0
-                    self.game_state = "FINAL_WAGERING"
-                else:
-                    self.game_state = "SHOWING_CLUE"
-            else:
-                self.game_state = "ERROR"
+            self.setup_new_round(1, 1)
+            cat_name = list(self.board.categories.keys())[0]
+            self.current_clue = self.board.categories[cat_name][0]
+            for p in self.players:
+                if not p.is_human: p.final_wager = p.determine_wager(p.score)
+            self.max_wager = self.players[0].score if self.players[0].is_human else 0
+            self.game_state = "FINAL_WAGERING"
 
     def select_clue(self, clue: Clue, player_index: int):
-        if not clue.is_answered:
-            self.current_clue = clue
-            self.active_player_index = player_index
-            
-            if clue.is_daily_double:
-                self.game_state = "WAGERING"
-                board_max = 1000 if self.round_num == 1 else 2000
-                self.max_wager = max(board_max, self.players[player_index].score)
-                self.current_wager = 5
-            else:
-                self.game_state = "SHOWING_CLUE"
+        self.current_clue = clue
+        self.active_player_index = player_index
+        if clue.is_daily_double:
+            self.game_state = "WAGERING"
+            board_max = 1000 if self.round_num == 1 else 2000
+            self.max_wager = max(board_max, self.players[player_index].score)
+            self.current_wager = 5
+        else:
+            self.game_state = "SHOWING_CLUE"
 
     def handle_answer(self, player_index: int, answer: str) -> bool:
         if self.current_clue is None: return False
-        
         player = self.players[player_index]
         
         if self.round_num == 3:
@@ -160,9 +141,7 @@ class JeopardyGameManager:
 
         if self.current_clue.check_ans(answer):
             player.add_score(pts)
-            
-            if self.round_num == 3:
-                self.game_state = "GAME_OVER"
+            if self.round_num == 3: self.game_state = "GAME_OVER"
             else:
                 self.current_clue.is_answered = True
                 self.current_clue = None
@@ -170,9 +149,7 @@ class JeopardyGameManager:
             return True
         else:
             player.minus_score(pts)
-            
-            if self.round_num == 3:
-                self.game_state = "GAME_OVER"
+            if self.round_num == 3: self.game_state = "GAME_OVER"
             elif self.current_clue.is_daily_double:
                 self.current_clue.is_answered = True
                 self.current_clue = None
@@ -180,7 +157,5 @@ class JeopardyGameManager:
             return False
 
     def check_board_complete(self):
-        if self.board.is_complete():
-            self.advance_round()
-        else:
-            self.game_state = "SHOWING_BOARD"
+        if self.board.is_complete(): self.advance_round()
+        else: self.game_state = "SHOWING_BOARD"
