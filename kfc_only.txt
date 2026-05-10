@@ -29,18 +29,18 @@ File Organization:
 
 Jeopardy_Project/
 │
-├── main.py                  # The entry point (initializes Pygame and runs the main loop)
+├── main.py          test        # The entry point (initializes Pygame and runs the main loop)
 ├── game_logic.py    test        # Contains the Game, Board, and Question classes
 ├── players.py       test        # Contains Actor, HumanPlayer, and AIPlayer
 ├── powerups.py              # (Optional) Contains your PowerUp classes for bonus marks
 ├── api.py           test        # Contains the Azure ChatGPT API connection code
-├── ui.py                    # Handles Pygame drawing (buttons, text, screens)
+├── ui.py            test        # Handles Pygame drawing (buttons, text, screens)
 │
 ├── assets/                  # Put all your downloaded files here!
-│   ├── images/              # Backgrounds, player icons
-│   ├── sounds/              # Buzzers, theme song, correct/wrong sound effects
+│   ├── images/      done        # Backgrounds, player icons
+│   ├── sounds/      done        # Buzzers, theme song, correct/wrong sound effects
 │   └── fonts/               # Custom .ttf fonts
 │
 ├── requirements_pip.txt     # (Required by slide 62)
-└── README.txt               # For your credits and run instructions
+└── README.md                # For your credits and run instructions
 

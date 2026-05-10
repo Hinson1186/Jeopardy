@@ -109,7 +109,7 @@ class LLMHelper:
             print("failed to make image:", e)
             return None
 
-# for testing only
+# ---Testing Code---
 if __name__ == "__main__":
     api = LLMHelper() 
     
@@ -118,7 +118,8 @@ if __name__ == "__main__":
     print(board)
 
     print("\n--- testing image ---")
-    # try to generate a random image to see if it works
+
+    # Generate random image
     img_path = api.generate_image_for_clue("a pixel art of a python snake")
     if img_path != None:
         Image.open(img_path).show()

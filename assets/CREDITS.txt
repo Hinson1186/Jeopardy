@@ -2,7 +2,7 @@
 RESOURCE CREDITS & ACKNOWLEDGMENTS
 =============================================================================================================================================
 Disclaimer: This game project is intended solely for academic demonstration and grading within the AIST1110 course. 
-Copyrighted materials are used under the educational "fair use" policy. This game will not be used or distributed for any commercial purposes.
+Copyrighted materials are used under educational "fair use" policy. This game will not be used or distributed for any commercial purposes.
 
 Audio:
 ---------------------
