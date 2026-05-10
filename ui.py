@@ -1,15 +1,12 @@
 import pygame
 import os
 
-# Colors
 BLUE = (6, 12, 233)
 YELLOW = (255, 204, 0)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
+RED = (200, 0, 0)
 
-# ==========================================
-# PUT YOUR EXACT FILE NAMES HERE
-# ==========================================
 ASSET_FILES = {
     "background": "background.jpg",
     "clue_board": "clue_board.jpg",
@@ -30,7 +27,6 @@ ASSET_FILES = {
 }
 
 class BoxSprite(pygame.sprite.Sprite):
-    """TV Version 6x5 Board Boxes"""
     def __init__(self, x, y, width, height, clue):
         super().__init__()
         self.clue = clue
@@ -84,7 +80,7 @@ class UIManager:
                 else:
                     self.icons[key] = scaled_img
             else:
-                print(f"Warning: Missing image {path}. Using black box fallback.")
+                print(f"Missing image {path}. Using black box fallback.")
                 surf = pygame.Surface(target_size)
                 surf.fill(BLACK)
                 if is_bg:
@@ -122,7 +118,6 @@ class UIManager:
                 current_line = [word]
         lines.append(' '.join(current_line))
         
-        # Center the block of text
         total_height = len(lines) * font.get_linesize()
         y_offset = rect.y + (rect.height - total_height) // 2
         
@@ -149,14 +144,42 @@ class UIManager:
                 box = BoxSprite(x, y, col_width, row_height, clue)
                 self.box_group.add(box)
 
+    def draw_menu(self, has_active_game):
+        self.screen.blit(self.bgs["LED_red"], (0, 0))
+        self.draw_text("JEOPARDY!", self.font_title, YELLOW, 640, 150)
+        
+        # Game Button
+        pygame.draw.rect(self.screen, BLUE, (440, 300, 400, 60), border_radius=10)
+        pygame.draw.rect(self.screen, WHITE, (440, 300, 400, 60), 3, border_radius=10)
+        self.draw_text("NEW GAME", self.font_large, WHITE, 640, 330)
+
+        # Resume Button
+        if has_active_game:
+            pygame.draw.rect(self.screen, (0, 150, 0), (440, 400, 400, 60), border_radius=10)
+            pygame.draw.rect(self.screen, WHITE, (440, 400, 400, 60), 3, border_radius=10)
+            self.draw_text("RESUME GAME", self.font_large, WHITE, 640, 430)
+
+    def draw_difficulty_menu(self):
+        self.screen.blit(self.bgs["LED_blue"], (0, 0))
+        self.draw_text("SELECT AI DIFFICULTY", self.font_title, YELLOW, 640, 150)
+        
+        diffs = [("EASY", 300, (0, 200, 0)), ("MEDIUM", 400, (200, 150, 0)), ("HARD", 500, (200, 0, 0))]
+        for text, y, color in diffs:
+            pygame.draw.rect(self.screen, color, (440, y, 400, 60), border_radius=10)
+            pygame.draw.rect(self.screen, WHITE, (440, y, 400, 60), 3, border_radius=10)
+            self.draw_text(text, self.font_large, WHITE, 640, y + 30)
+
     def draw_board_screen(self, game_manager):
-        # TV studio background
         self.screen.blit(self.bgs["stage"], (0, 0))
         
         # Player scores
         self.screen.blit(self.icons["money"], (40, 20))
         score_text = f"P1: ${game_manager.players[0].score}   |   AI 1: ${game_manager.players[1].score}   |   AI 2: ${game_manager.players[2].score}"
         self.draw_text(score_text, self.font_large, WHITE, 90, 20, center=False)
+
+        # Leave Button
+        pygame.draw.rect(self.screen, RED, (1100, 20, 150, 40), border_radius=8)
+        self.draw_text("MENU", self.font_small, WHITE, 1175, 40)
 
         # Category headers
         start_x = 40
@@ -171,6 +194,27 @@ class UIManager:
             self.draw_text(cat_name.upper(), cat_font, WHITE, header_rect.centerx, header_rect.centery)
 
         self.box_group.draw(self.screen)
+
+    def draw_wagering_screen(self, game_manager):
+        self.screen.blit(self.bgs["theme_background"], (0, 0))
+        
+        self.draw_text("DAILY DOUBLE!", self.font_title, YELLOW, 640, 150)
+        self.draw_text(f"Max Wager: ${game_manager.max_wager}", self.font_large, WHITE, 640, 250)
+        self.draw_text(f"Your Wager: ${game_manager.current_wager}", self.font_title, WHITE, 640, 350)
+
+        slider_rect = pygame.Rect(340, 450, 600, 20)
+        pygame.draw.rect(self.screen, WHITE, slider_rect, border_radius=10)
+
+        percent = (game_manager.current_wager - 5) / max(1, (game_manager.max_wager - 5))
+        handle_x = 340 + int(percent * 600)
+        
+        pygame.draw.circle(self.screen, YELLOW, (handle_x, 460), 20)
+        pygame.draw.circle(self.screen, BLACK, (handle_x, 460), 20, 3) # Black outline
+
+        btn_rect = pygame.Rect(540, 550, 200, 60)
+        pygame.draw.rect(self.screen, BLUE, btn_rect, border_radius=15)
+        pygame.draw.rect(self.screen, YELLOW, btn_rect, 3, border_radius=15)
+        self.draw_text("WAGER!", self.font_large, YELLOW, 640, 580)
 
     def draw_clue_screen(self, clue):
         # Question background
@@ -189,14 +233,12 @@ class UIManager:
             pygame.draw.rect(self.screen, WHITE, rect, 2)
             self.draw_text(f"{i+1}. {option}", self.font_small, WHITE, rect.centerx, rect.centery)
 
+    def draw_ai_turn_screen(self, bot_name):
+        self.screen.blit(self.bgs["contestant"], (0, 0))
+        self.draw_text(f"{bot_name} is thinking...", self.font_title, YELLOW, 640, 360)
+
     def draw_loading_screen(self):
         self.screen.blit(self.bgs["LED_blue"], (0, 0))
         self.screen.blit(self.icons["time_passing"], (600, 200))
         self.draw_text("Generating TV Jeopardy Board...", self.font_large, YELLOW, 640, 300)
         self.draw_text("Using Azure ChatGPT to fetch 30 questions (This takes ~15s)", self.font_small, WHITE, 640, 350)
-
-    def draw_menu(self):
-        self.screen.blit(self.bgs["LED_red"], (0, 0))
-        self.draw_text("JEOPARDY!", self.font_title, YELLOW, 640, 200)
-        self.draw_text("TV Edition - 6 Categories", self.font_large, WHITE, 640, 300)
-        self.draw_text("Click anywhere to start", self.font_large, WHITE, 640, 450)

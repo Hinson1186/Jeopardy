@@ -6,17 +6,15 @@ from game_logic import JeopardyGameManager
 from ui import UIManager
 
 def cleanup_temp_images():
-    """Deletes temporary generated images when the game closes."""
     print("Cleaning up temporary image files...")
     temp_files = glob.glob("assets/images/clue_img_*.png")
     for file in temp_files:
-        try:
-            os.remove(file)
-        except Exception:
-            pass
+        try: os.remove(file)
+        except Exception: pass
 
 def main():
-    # Prevent buzzing sound when loading mp3s
+    # --- AUDIO FIX ---
+    # This prevents the loud static/buzzing sound when loading mp3s
     pygame.mixer.pre_init(44100, -16, 2, 2048)
     pygame.init()
     
@@ -25,40 +23,40 @@ def main():
     clock = pygame.time.Clock()
 
     try:
-        pygame.mixer.music.load("assets/sounds/Jeopardy-theme-song.mp3")
+        pygame.mixer.music.load("assets/sounds/theme.mp3")
         pygame.mixer.music.set_volume(0.3)
         pygame.mixer.music.play(-1)
-    except:
-        pass
+    except: pass
 
     try:
-        correct_sound = pygame.mixer.Sound("assets/sounds/Correct.wav")
-        wrong_sound = pygame.mixer.Sound("assets/sounds/Wrong.wav")
+        correct_snd = pygame.mixer.Sound("assets/sounds/correct.wav")
+        wrong_snd = pygame.mixer.Sound("assets/sounds/wrong.wav")
     except:
-        correct_sound = wrong_sound = None
+        correct_snd = wrong_snd = None
 
     game = JeopardyGameManager()
     ui = UIManager(screen)
 
+    # Variables for the AI thinking timer
     ai_timer_start = 0
     ai_think_time = 0
 
     running = True
     while running:
-        pos = pygame.mouse.get_pos()
-
+        pos = pygame.mouse.get_pos() 
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             
             if event.type == pygame.MOUSEBUTTONDOWN:
-
+                
                 # --- START MENU ---
                 if game.game_state == "START_MENU":
-                    # NEW GAME
+                    # Clicked "NEW GAME"
                     if 440 <= pos[0] <= 840 and 300 <= pos[1] <= 360:
                         game.game_state = "DIFFICULTY_MENU"
-                    # RESUME
+                    # Clicked "RESUME"
                     elif game.has_active_game and 440 <= pos[0] <= 840 and 400 <= pos[1] <= 460:
                         game.game_state = "SHOWING_BOARD"
 
@@ -82,7 +80,7 @@ def main():
 
                 # --- MAIN BOARD ---
                 elif game.game_state == "SHOWING_BOARD":
-                    # MENU
+                    # Check "MENU" button (Top Right)
                     if 1100 <= pos[0] <= 1250 and 20 <= pos[1] <= 60:
                         game.game_state = "START_MENU"
                     else:
@@ -92,11 +90,11 @@ def main():
 
                 # --- WAGERING ---
                 elif game.game_state == "WAGERING":
-                    # Wager!
+                    # Clicked "Wager!"
                     if 540 <= pos[0] <= 740 and 550 <= pos[1] <= 610:
                         game.game_state = "SHOWING_CLUE"
 
-                # --- ANSWERING CLUE ---
+                # --- ANSWERING A CLUE ---
                 elif game.game_state == "SHOWING_CLUE":
                     clicked_index = -1
                     if 400 <= pos[1] <= 450: clicked_index = 0
@@ -107,57 +105,59 @@ def main():
                     if clicked_index != -1 and clicked_index < len(game.current_clue.mc_options):
                         selected_answer = game.current_clue.mc_options[clicked_index]
                         
+                        # Handle human answer
                         is_correct = game.handle_human_answer(selected_answer)
                         
                         if is_correct:
-                            if correct_sound: correct_sound.play()
+                            if correct_snd: correct_snd.play()
                         else:
-                            if wrong_sound: wrong_sound.play()
+                            if wrong_snd: wrong_snd.play()
                             
+                            # If AI's turn, set up the timer!
                             if game.game_state == "AI_TURN":
                                 ai_player = game.players[game.ai_turn_index]
-                                ai_think_time = ai_player.delay_time() * 1000
+                                # Convert float seconds to integer milliseconds
+                                ai_think_time = int(ai_player.get_delay_time() * 1000) 
                                 ai_timer_start = pygame.time.get_ticks()
 
                         ui.build_board_sprites(game.board)
 
                 # --- GAME OVER ---
                 elif game.game_state == "GAME_OVER":
+                    # Click anywhere to go back to main menu
                     game.has_active_game = False
                     game.game_state = "START_MENU"
 
-        # Wager Slider
+        # --- UPDATE LOGIC (No clicks needed) ---
+        
+        # Wager Slider Dragging
         if game.game_state == "WAGERING":
             if pygame.mouse.get_pressed()[0]:
-                # If mouse is near the slider
                 if 340 <= pos[0] <= 940 and 400 <= pos[1] <= 500:
-                    # Calculate percentage based on mouse position
-                    percent = (pos[0] - 340) / 600.0
-                    percent = max(0.0, min(1.0, percent))
-                    
+                    percent = max(0.0, min(1.0, (pos[0] - 340) / 600.0))
                     wager_range = game.max_wager - 5
                     new_wager = 5 + int(percent * wager_range)
-                    
-                    # Round to nearest $5
                     game.current_wager = round(new_wager / 5) * 5
-        
-        # AI Timer
+
+        # AI Timer Logic
         elif game.game_state == "AI_TURN":
             current_time = pygame.time.get_ticks()
             if current_time - ai_timer_start >= ai_think_time:
+                # Time's up! Process AI steal
                 ai_got_it = game.handle_ai_steal()
                 
                 if ai_got_it:
-                    if correct_sound: correct_sound.play()
+                    if correct_snd: correct_snd.play()
                     ui.build_board_sprites(game.board)
                 else:
-                    if wrong_sound: wrong_sound.play()
-                    # If still in AI_TURN, the next AI is up
+                    if wrong_snd: wrong_snd.play()
+                    # If game is STILL in AI_TURN, it means the next AI is up!
                     if game.game_state == "AI_TURN":
                         ai_player = game.players[game.ai_turn_index]
                         ai_think_time = int(ai_player.get_delay_time() * 1000)
                         ai_timer_start = pygame.time.get_ticks()
                     else:
+                        # Both failed, back to board
                         ui.build_board_sprites(game.board)
 
         # --- DRAWING ---
@@ -172,6 +172,7 @@ def main():
         elif game.game_state == "SHOWING_CLUE":
             ui.draw_clue_screen(game.current_clue)
         elif game.game_state == "AI_TURN":
+            # Show a screen telling the human that the bot is thinking
             current_bot_name = game.players[game.ai_turn_index].name
             ui.draw_ai_turn_screen(current_bot_name)
         elif game.game_state == "GAME_OVER":
@@ -179,7 +180,7 @@ def main():
             ui.screen.blit(ui.icons["rank"], (600, 150))
             ui.draw_text("GAME OVER!", ui.font_title, YELLOW, 640, 300)
             
-            # Find winner
+            # Find the winner
             winner = max(game.players, key=lambda p: p.score)
             ui.draw_text(f"WINNER: {winner.name} with ${winner.score}", ui.font_large, WHITE, 640, 400)
             ui.draw_text("Click to return to menu", ui.font_small, WHITE, 640, 500)
