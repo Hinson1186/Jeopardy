@@ -22,14 +22,24 @@ class AI_Player(Actor):
         self.difficulty = difficulty
         self.is_human = False
     
-    def delay_time(self) -> float:
-        """Fake AI thinking time."""
-        delays = {"easy": (2.5, 4.0), "medium": (1.5, 3.0), "hard": (0.5, 1.5)}
-        low, high = delays.get(self.difficulty, (1.5, 3.0))
+    def get_reaction_time(self) -> float:
+        """Fake AI reaction time."""
+        reaction_speeds = {"easy": (5.0, 8.0), "medium": (3.0, 5.0), "hard": (1.0, 3.0)}
+        low, high = reaction_speeds.get(self.difficulty, (3.0, 5.0))
         return random.uniform(low, high)
 
-    def is_correct(self) -> bool:
-        """AI get the answer right based on probability."""
+    def decides_to_answer_correctly(self) -> bool:
+        """AI gets the answer right based on probability."""
         chances = {"easy": 0.5, "medium": 0.75, "hard": 0.9}
         probability = chances.get(self.difficulty, 0.75)
         return random.random() < probability
+        
+    def determine_wager(self, max_wager: int) -> int:
+        """AI logic for Daily Doubles and Final Jeopardy"""
+        aggression = {"easy": 0.2, "medium": 0.5, "hard": 0.8}
+        pct = aggression.get(self.difficulty, 0.5)
+        
+        # Add some randomness to their bet
+        bet = int(max_wager * random.uniform(pct * 0.5, pct * 1.2))
+        bet = max(5, min(bet, max_wager))
+        return round(bet / 5) * 5
