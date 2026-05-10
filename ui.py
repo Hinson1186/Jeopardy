@@ -185,7 +185,7 @@ class UIManager:
             surf.fill((0, 0, 0, 180))
             self.screen.blit(surf, rect.topleft)
             pygame.draw.rect(self.screen, WHITE, rect, 2)
-            self.draw_text(f"{i+1}. {option}", self.font_small, rect.centerx, rect.centery)
+            self.draw_text(f"{i+1}. {option}", self.font_small, WHITE, rect.centerx, rect.centery)
 
     def draw_loading_screen(self, round_num):
         self.screen.blit(self.bgs["loading"], (0, 0))
