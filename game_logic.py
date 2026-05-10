@@ -39,8 +39,8 @@ class Board:
                     pt_value=q_data.get('value')
                 )
                 
-                # 10% chance to generate an image for this clue
-                if random.random() < 0.10:
+                # 5% chance to generate an image for this clue
+                if random.random() < 0.05:
                     img_prompt = f"A clear, simple visual representation of {clue.correct_answer} without any text."
                     clue.image_path = llm_helper.generate_image_for_clue(img_prompt)
 
