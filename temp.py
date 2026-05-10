@@ -1,186 +1,266 @@
-import random
-from players import Player, AI_Player
-from api import LLMHelper
+import pygame
+import sys
+import os
+import glob
+from game_logic import JeopardyGameManager
+from ui import UIManager
+from powerups import ExtraTime, PointDoubler, Strike
 
-class Clue:
-    def __init__(self, category: str, question: str, correct_answer: str, wrong_answers: list, pt_value: int):
-        self.category = category
-        self.question = question
-        self.correct_answer = correct_answer
-        self.pt_value = pt_value
-        self.is_answered = False
-        self.is_daily_double = False
-        self.image_path = None
-        
-        self.mc_options = [correct_answer] + wrong_answers
-        random.shuffle(self.mc_options)
+YELLOW = (255, 255, 0)
+WHITE = (255, 255, 255)
+
+def cleanup_temp_images():
+    """Delete temporary generated images when the game closes."""
+    print("Cleaning up temporary image files...")
+    temp_files = glob.glob("assets/images/clue_img_*.png")
+    for file in temp_files:
+        try: os.remove(file)
+        except Exception: pass
+
+def main():
+    pygame.init()
+    pygame.mixer.pre_init()
     
-    def check_ans(self, ans: str) -> bool:
-        return ans == self.correct_answer
+    screen = pygame.display.set_mode((1280, 720)) 
+    pygame.display.set_caption("Jeopardy! TV Edition")
+    clock = pygame.time.Clock()
 
-class Board:
-    def __init__(self):
-        self.categories: dict[str, list[Clue]] = {}
-        
-    def populate_from_api(self, api_data: dict, llm_helper: LLMHelper, num_daily_doubles: int = 1):
-        self.categories.clear()
-        all_clues = []
-        
-        for category_data in api_data.get('categories', []):
-            cat_name = category_data.get('name')
-            self.categories[cat_name] = []
+    # --- SOUND LOADING ---
+    try:
+        pygame.mixer.music.load("assets/sounds/Jeopardy-theme-song.wav")
+        pygame.mixer.music.set_volume(0.3)
+        pygame.mixer.music.play(-1)
+    except:
+        pass
+
+    try:
+        correct_sound = pygame.mixer.Sound("assets/sounds/Correct.wav")
+        wrong_sound = pygame.mixer.Sound("assets/sounds/Wrong.wav")
+        beeper_sound = pygame.mixer.Sound("assets/sounds/CountDownBeeper.wav")
+    except:
+        correct_sound = wrong_sound = beeper_sound = None
+
+    game = JeopardyGameManager()
+    ui = UIManager(screen)
+
+    powerups = [
+        ExtraTime(ui.icons["time_passing"]), 
+        PointDoubler(ui.icons["coin"]), 
+        Strike(ui.icons["heart"])
+    ]
+
+    # Timers
+    ai_timer_start = 0
+    ai_think_time = 0
+    clue_start_time = 0
+    clue_time_limit = 10000 
+    beeper_playing = False
+    struck_choice_index = -1 
+    time_left = 10
+    
+    # Answer tracker
+    active_ai_list = []
+    current_ai_turn = 0
+
+    running = True
+    while running:
+        pos = pygame.mouse.get_pos()
+        current_time = pygame.time.get_ticks()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+                
+            # --- DEV TOOL: PRESS F1 TO SKIP ROUND ---
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_F1 and game.game_state == "SHOWING_BOARD":
+                    game.advance_round()
+                    if game.game_state == "LOADING":
+                        ui.draw_loading_screen(game.round_num)
+                        pygame.display.flip()
+                        if game.game_state == "SHOWING_BOARD":
+                            ui.build_board_sprites(game.board)
             
-            for q_data in category_data.get('questions', []):
-                clue = Clue(
-                    category=cat_name,
-                    question=q_data.get('clue'),
-                    correct_answer=q_data.get('correct'),
-                    wrong_answers=[c for c in q_data.get('choices', []) if c != q_data.get('correct')],
-                    pt_value=q_data.get('value')
-                )
-                
-                # 10% chance to generate an image for this clue
-                if random.random() < 0.10:
-                    img_prompt = f"A clear, simple visual representation of {clue.correct_answer} without any text."
-                    clue.image_path = llm_helper.generate_image_for_clue(img_prompt)
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if game.game_state == "START_MENU":
+                    if 440 <= pos[0] <= 840 and 400 <= pos[1] <= 460:
+                        # Reset game completely
+                        game = JeopardyGameManager()
+                        for p in powerups: p.is_used = False
+                        game.game_state = "LOBBY"
 
-                self.categories[cat_name].append(clue)
-                all_clues.append(clue)
-                
-        for cat in self.categories:
-            self.categories[cat].sort(key=lambda x: x.pt_value)
+                elif game.game_state == "LOBBY":
+                    # Add AI Buttons
+                    if 300 <= pos[0] <= 600:
+                        if 400 <= pos[1] <= 450: game.add_ai_player("easy")
+                        elif 480 <= pos[1] <= 530: game.add_ai_player("medium")
+                        elif 560 <= pos[1] <= 610: game.add_ai_player("hard")
+                    
+                    # Start Game Button
+                    if 700 <= pos[0] <= 1000 and 450 <= pos[1] <= 530:
+                        game.game_state = "LOADING"
+                        ui.draw_loading_screen(game.round_num)
+                        pygame.display.flip()
+                        game.setup_new_round(num_cats=6, clues_per=5)
+                        if game.game_state == "SHOWING_BOARD":
+                            ui.build_board_sprites(game.board)
 
-        if all_clues:
-            picks = min(num_daily_doubles, len(all_clues))
-            dd_clues = random.sample(all_clues, picks)
-            for dd in dd_clues:
-                dd.is_daily_double = True
+                elif game.game_state == "SHOWING_BOARD":
+                    # LEAVE BUTTON
+                    if 1100 <= pos[0] <= 1250 and 20 <= pos[1] <= 60:
+                        game.game_state = "START_MENU"
+                    else:
+                        for box in ui.box_group:
+                            if box.rect.collidepoint(pos) and not box.clue.is_answered:
+                                game.select_clue(box.clue, 0)
+                                if game.game_state == "SHOWING_CLUE":
+                                    clue_start_time = pygame.time.get_ticks()
+                                    clue_time_limit = 10000
+                                    beeper_playing = False
+                                    struck_choice_index = -1
+                                    
+                                    active_ai_list = [p for p in game.players if not p.is_human]
+                                    active_ai_list.sort(key=lambda x: x.get_reaction_time())
+                                    current_ai_turn = 0
+                                    
+                                    if active_ai_list:
+                                        ai_think_time = int(active_ai_list[0].get_reaction_time() * 1000)
+                                        ai_timer_start = pygame.time.get_ticks()
 
-    def is_complete(self) -> bool:
-        for clues in self.categories.values():
-            if any(not c.is_answered for c in clues):
-                return False
-        return True
+                elif game.game_state in ["WAGERING", "FINAL_WAGERING"]:
+                    if 540 <= pos[0] <= 740 and 550 <= pos[1] <= 610:
+                        game.game_state = "SHOWING_CLUE"
+                        clue_start_time = pygame.time.get_ticks()
+                        beeper_playing = False
+                        active_ai_list = []
 
-class JeopardyGameManager:
-    def __init__(self):
-        self.llm_helper = LLMHelper()
-        self.board = Board()
-        
-        self.players = [Player("Human")]
-        self.ai_counter = 1
-        
-        self.current_clue = None
-        self.game_state = "START_MENU" 
-        self.round_num = 1
-        
-        self.current_wager = 5
-        self.max_wager = 1000
-        
-        self.active_player_index = 0
+                elif game.game_state == "SHOWING_CLUE":
+                    # POWERUPS
+                    for p in powerups:
+                        if not p.is_used and p.rect.collidepoint(pos):
+                            p.is_used = True
+                            if p.name == "Extra Time":
+                                clue_time_limit += 5000
+                                if beeper_sound: beeper_sound.stop()
+                                beeper_playing = False
+                            elif p.name == "Point Doubler":
+                                game.current_clue.pt_value *= 2
+                            elif p.name == "Strike":
+                                correct_ans = game.current_clue.correct_answer
+                                wrong_indices = [i for i, opt in enumerate(game.current_clue.mc_options) if opt != correct_ans]
+                                if wrong_indices:
+                                    struck_choice_index = random.choice(wrong_indices)
 
-    def add_ai_player(self, difficulty: str):
-        """Adds an AI player to the lobby."""
-        if len(self.players) < 3:
-            self.players.append(AI_Player(f"Bot {self.ai_counter}", difficulty=difficulty))
-            self.ai_counter += 1
+                    # ANSWERING
+                    clicked_index = -1
+                    if 400 <= pos[1] <= 450: clicked_index = 0
+                    elif 470 <= pos[1] <= 520: clicked_index = 1
+                    elif 540 <= pos[1] <= 590: clicked_index = 2
+                    elif 610 <= pos[1] <= 660: clicked_index = 3
 
-    def remove_ai_player(self):
-        if len(self.players) > 1:
-            self.players.pop()
-            self.ai_counter -= 1
-
-    def advance_round(self):
-        self.round_num += 1
-        
-        # Double Jeopardy
-        if self.round_num == 2:
-            self.game_state = "LOADING"
-            api_data = self.llm_helper.generate_jeopardy_board(num_categories=6, clues_per_category=5, round_num=2)
-            if api_data:
-                self.board.populate_from_api(api_data, self.llm_helper, num_daily_doubles=2)
-                self.game_state = "SHOWING_BOARD"
-            else:
-                self.game_state = "ERROR"
-                
-        # Final Jeopardy
-        elif self.round_num == 3:
-            self.players = [p for p in self.players if p.score > 0]
-            
-            if len(self.players) == 0:
-                self.game_state = "GAME_OVER"
-                return
-                
-            self.game_state = "LOADING"
-            api_data = self.llm_helper.generate_jeopardy_board(num_categories=1, clues_per_category=1, round_num=3)
-            if api_data:
-                self.board.populate_from_api(api_data, self.llm_helper, num_daily_doubles=0)
-                
-                cat_name = list(self.board.categories.keys())[0]
-                self.current_clue = self.board.categories[cat_name][0]
-                
-                for p in self.players:
-                    if not p.is_human:
-                        p.final_wager = p.determine_wager(p.score)
+                    if clicked_index != -1 and clicked_index != struck_choice_index and clicked_index < len(game.current_clue.mc_options):
+                        if beeper_sound: beeper_sound.stop()
                         
-                self.active_player_index = 0
-                if self.players[0].is_human:
-                    self.max_wager = self.players[0].score
-                    self.current_wager = 0
-                    self.game_state = "FINAL_WAGERING"
+                        selected_answer = game.current_clue.mc_options[clicked_index]
+                        is_correct = game.handle_answer(0, selected_answer) # 0 is Human
+                        
+                        if is_correct:
+                            if correct_sound: correct_sound.play()
+                        else:
+                            if wrong_sound: wrong_sound.play()
+                            
+                        if game.game_state == "LOADING":
+                            ui.draw_loading_screen(game.round_num)
+                            pygame.display.flip()
+                        
+                        ui.build_board_sprites(game.board)
+
+        # --- SLIDER DRAGGING ---
+        if game.game_state in ["WAGERING", "FINAL_WAGERING"]:
+            if pygame.mouse.get_pressed()[0]:
+                if 340 <= pos[0] <= 940 and 400 <= pos[1] <= 500:
+                    percent = max(0.0, min(1.0, (pos[0] - 340) / 600.0))
+                    min_w = 0 if game.game_state == "FINAL_WAGERING" else 5
+                    new_wager = min_w + int(percent * (game.max_wager - min_w))
+                    game.current_wager = round(new_wager / 5) * 5
+        
+        # --- HUMAN COUNTDOWN ---
+        elif game.game_state == "SHOWING_CLUE" and game.active_player_index == 0:
+            elapsed = current_time - clue_start_time
+            time_left = (clue_time_limit - elapsed) / 1000.0
+            
+            if time_left <= 5 and not beeper_playing:
+                if beeper_sound: beeper_sound.play(-1)
+                beeper_playing = True
+
+            if time_left <= 0:
+                if beeper_sound: beeper_sound.stop()
+                if wrong_sound: wrong_sound.play()
+                
+                game.handle_answer(0, "TIME_OUT")
+                ui.build_board_sprites(game.board)
+
+        # --- AI STEALING & BUZZING LOGIC ---
+        elif game.game_state == "SHOWING_CLUE" and active_ai_list and current_ai_turn < len(active_ai_list):
+            if current_time - ai_timer_start >= ai_think_time:
+                ai_player = active_ai_list[current_ai_turn]
+                
+                true_idx = game.players.index(ai_player)
+                
+                if ai_player.decides_to_answer_correctly():
+                    if correct_sound: correct_sound.play()
+                    if beeper_sound: beeper_sound.stop()
+                    game.handle_answer(true_idx, game.current_clue.correct_answer)
                 else:
-                    self.game_state = "SHOWING_CLUE"
-            else:
-                self.game_state = "ERROR"
+                    if wrong_sound: wrong_sound.play()
+                    game.handle_answer(true_idx, "WRONG_GUESS")
+                    
+                    current_ai_turn += 1
+                    if current_ai_turn < len(active_ai_list):
+                        ai_think_time = int(active_ai_list[current_ai_turn].get_reaction_time() * 1000)
+                        ai_timer_start = pygame.time.get_ticks()
+                        
+                ui.build_board_sprites(game.board)
 
-    def select_clue(self, clue: Clue, player_index: int):
-        if not clue.is_answered:
-            self.current_clue = clue
-            self.active_player_index = player_index
+        # --- DRAWING ---
+        if game.game_state == "START_MENU":
+            ui.draw_menu()
+        elif game.game_state == "LOBBY":
+            ui.draw_lobby(game)
+        elif game.game_state == "SHOWING_BOARD":
+            ui.draw_board_screen(game)
+        elif game.game_state in ["WAGERING", "FINAL_WAGERING"]:
+            ui.draw_wagering_screen(game, is_final=(game.round_num == 3))
+        elif game.game_state == "SHOWING_CLUE":
+            ui.draw_clue_screen(game.current_clue)
+            time_text = f"Time: {int(max(0, time_left))}"
+            time_color = RED if time_left < 5 else WHITE
+            ui.draw_text(time_text, ui.font_large, time_color, 1150, 50)
             
-            if clue.is_daily_double:
-                self.game_state = "WAGERING"
-                board_max = 1000 if self.round_num == 1 else 2000
-                self.max_wager = max(board_max, self.players[player_index].score)
-                self.current_wager = 5
-            else:
-                self.game_state = "SHOWING_CLUE"
+            # Powerups & Strike
+            for i, p in enumerate(powerups): p.draw(screen, 1200 - (i * 75), 20)
+            if struck_choice_index != -1:
+                y_strike = 400 + (struck_choice_index * 70) 
+                pygame.draw.line(screen, RED, (340, y_strike), (940, y_strike + 50), 8)
+                pygame.draw.line(screen, RED, (940, y_strike), (340, y_strike + 50), 8)
 
-    def handle_answer(self, player_index: int, answer: str) -> bool:
-        if self.current_clue is None: return False
-        
-        player = self.players[player_index]
-        
-        if self.round_num == 3:
-            pts = self.current_wager if player.is_human else getattr(player, 'final_wager', 0)
-        elif self.current_clue.is_daily_double:
-            pts = self.current_wager if player.is_human else player.determine_wager(self.max_wager)
-        else:
-            pts = self.current_clue.pt_value
-
-        if self.current_clue.check_ans(answer):
-            player.add_score(pts)
+        elif game.game_state == "GAME_OVER":
+            ui.screen.blit(ui.bgs["stage"], (0, 0))
+            ui.screen.blit(ui.icons["rank"], (600, 150))
+            ui.draw_text("GAME OVER!", ui.font_title, YELLOW, 640, 300)
             
-            if self.round_num == 3:
-                self.game_state = "GAME_OVER"
-            else:
-                self.current_clue.is_answered = True
-                self.current_clue = None
-                self.check_board_complete()
-            return True
-        else:
-            player.minus_score(pts)
-            
-            if self.round_num == 3:
-                self.game_state = "GAME_OVER"
-            elif self.current_clue.is_daily_double:
-                self.current_clue.is_answered = True
-                self.current_clue = None
-                self.check_board_complete()
-            return False
+            if game.players:
+                winner = max(game.players, key=lambda p: p.score)
+                ui.draw_text(f"WINNER: {winner.name} with ${winner.score}", ui.font_large, WHITE, 640, 400)
+            ui.draw_text("Click to return to menu", ui.font_small, WHITE, 640, 500)
 
-    def check_board_complete(self):
-        if self.board.is_complete():
-            self.advance_round()
-        else:
-            self.game_state = "SHOWING_BOARD"
+        pygame.display.flip()
+        clock.tick(60)
+
+    cleanup_temp_images()
+    if beeper_sound: beeper_sound.stop()
+    pygame.quit()
+    sys.exit()
+
+if __name__ == "__main__":
+    main()
