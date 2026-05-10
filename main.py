@@ -5,6 +5,8 @@ import glob
 from game_logic import JeopardyGameManager
 from ui import UIManager
 
+YELLOW = (255, 255, 0)
+
 def cleanup_temp_images():
     """Deletes temporary generated images when the game closes."""
     print("Cleaning up temporary image files...")
@@ -24,6 +26,7 @@ def main():
     pygame.display.set_caption("Jeopardy! TV Edition")
     clock = pygame.time.Clock()
 
+    # --- SOUND LOADING ---
     try:
         pygame.mixer.music.load("assets/sounds/Jeopardy-theme-song.mp3")
         pygame.mixer.music.set_volume(0.3)
@@ -34,8 +37,9 @@ def main():
     try:
         correct_sound = pygame.mixer.Sound("assets/sounds/Correct.wav")
         wrong_sound = pygame.mixer.Sound("assets/sounds/Wrong.wav")
+        beeper_sound = pygame.mixer.Sound("assets/sounds/CountDownBeeper.wav")
     except:
-        correct_sound = wrong_sound = None
+        correct_sound = wrong_sound = beeper_sound = None
 
     game = JeopardyGameManager()
     ui = UIManager(screen)
@@ -43,9 +47,15 @@ def main():
     ai_timer_start = 0
     ai_think_time = 0
 
+    clue_start_time = 0
+    clue_time_limit = 10000  # Total 10 seconds to answer (in milliseconds)
+    beeper_playing = False
+    time_left = 10
+
     running = True
     while running:
         pos = pygame.mouse.get_pos()
+        current_time = pygame.time.get_ticks()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -89,12 +99,19 @@ def main():
                         for box in ui.box_group:
                             if box.rect.collidepoint(pos) and not box.clue.is_answered:
                                 game.select_clue(box.clue, game.players[0])
+                                
+                                # Start timer if it's not a Daily Double
+                                if game.game_state == "SHOWING_CLUE":
+                                    clue_start_time = pygame.time.get_ticks()
+                                    beeper_playing = False
 
                 # --- WAGERING ---
                 elif game.game_state == "WAGERING":
                     # Wager!
                     if 540 <= pos[0] <= 740 and 550 <= pos[1] <= 610:
                         game.game_state = "SHOWING_CLUE"
+                        clue_start_time = pygame.time.get_ticks()
+                        beeper_playing = False
 
                 # --- ANSWERING CLUE ---
                 elif game.game_state == "SHOWING_CLUE":
@@ -105,8 +122,9 @@ def main():
                     elif 610 <= pos[1] <= 660: clicked_index = 3
 
                     if clicked_index != -1 and clicked_index < len(game.current_clue.mc_options):
-                        selected_answer = game.current_clue.mc_options[clicked_index]
+                        if beeper_sound: beeper_sound.stop()
                         
+                        selected_answer = game.current_clue.mc_options[clicked_index]
                         is_correct = game.handle_human_answer(selected_answer)
                         
                         if is_correct:
@@ -141,6 +159,30 @@ def main():
                     # Round to nearest $5
                     game.current_wager = round(new_wager / 5) * 5
         
+        elif game.game_state == "SHOWING_CLUE":
+            elapsed = current_time - clue_start_time
+            time_left = (clue_time_limit - elapsed) / 1000.0 # float seconds
+            
+            # Play beeper if 5 seconds or less
+            if time_left <= 5 and not beeper_playing:
+                if beeper_sound:
+                    beeper_sound.play(-1)
+                beeper_playing = True
+
+            # TIME OUT
+            if time_left <= 0:
+                if beeper_sound: beeper_sound.stop()
+                if wrong_sound: wrong_sound.play()
+                
+                # Treat timeout as a wrong answer
+                is_correct = game.handle_human_answer("TIME_OUT_WRONG_ANSWER")
+                if not is_correct and game.game_state == "AI_TURN":
+                    ai_player = game.players[game.ai_turn_index]
+                    ai_think_time = int(ai_player.get_delay_time() * 1000)
+                    ai_timer_start = pygame.time.get_ticks()
+                    
+                ui.build_board_sprites(game.board)
+
         # AI Timer
         elif game.game_state == "AI_TURN":
             current_time = pygame.time.get_ticks()
@@ -155,7 +197,7 @@ def main():
                     # If still in AI_TURN, the next AI is up
                     if game.game_state == "AI_TURN":
                         ai_player = game.players[game.ai_turn_index]
-                        ai_think_time = int(ai_player.get_delay_time() * 1000)
+                        ai_think_time = int(ai_player.delay_time() * 1000)
                         ai_timer_start = pygame.time.get_ticks()
                     else:
                         ui.build_board_sprites(game.board)
@@ -171,6 +213,9 @@ def main():
             ui.draw_wagering_screen(game)
         elif game.game_state == "SHOWING_CLUE":
             ui.draw_clue_screen(game.current_clue)
+            time_text = f"Time: {int(max(0, time_left))}"
+            time_color = (255, 0, 0) if time_left < 5 else (255, 255, 255)
+            ui.draw_text(time_text, ui.font_large, time_color, 1150, 50)
         elif game.game_state == "AI_TURN":
             current_bot_name = game.players[game.ai_turn_index].name
             ui.draw_ai_turn_screen(current_bot_name)
@@ -188,6 +233,7 @@ def main():
         clock.tick(60)
 
     cleanup_temp_images()
+    if beeper_sound: beeper_sound.stop()
     pygame.quit()
     sys.exit()
 
