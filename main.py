@@ -6,6 +6,7 @@ from game_logic import JeopardyGameManager
 from ui import UIManager
 
 YELLOW = (255, 255, 0)
+WHITE = (255, 255, 255)
 
 def cleanup_temp_images():
     """Deletes temporary generated images when the game closes."""
